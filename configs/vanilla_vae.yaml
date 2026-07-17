@@ -1,0 +1,10 @@
+extends: base.yaml
+
+mlflow:
+  experiment_name: vanilla-vae
+
+model:
+  type: vanilla_vae
+  latent_dim: 16
+  hidden_dims: [128, 64, 32]
+  input_length: 250          # samples per ECG segment; must match preprocessing

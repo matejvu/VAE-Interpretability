@@ -1,0 +1,29 @@
+# Shared defaults. Variant configs (vanilla_vae.yaml, beta_vae.yaml,
+# semi_supervised.yaml) set `extends: base.yaml` and override/add keys below.
+
+data:
+  dataset: mitbih
+  data_dir: data/processed/v1_bandpass_seg250   # points at a specific
+                                                  # versioned preprocessing
+                                                  # output (see preprocessing.py)
+  batch_size: 128
+  val_split: 0.15
+  sample_rate: 360
+  num_workers: 4
+
+training:
+  epochs: 100
+  lr: 0.001
+  optimizer: adam
+  weight_decay: 0.0
+  seed: 42
+  device: cuda          # "cuda" or "cpu" — falls back to cpu automatically
+                          # if cuda unavailable
+  checkpoint_every: 10   # epochs; best-val checkpoint is always also saved
+  early_stopping_patience: 15
+
+mlflow:
+  experiment_name: CHANGE_ME   # set per-variant, e.g. "vanilla-vae"
+  tracking_uri_env_var: MLFLOW_TRACKING_URI   # read from environment, not
+                                                # hardcoded here (keep secrets
+                                                # out of version control)

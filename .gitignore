@@ -1,4 +1,35 @@
-#literature
+# Environments
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Data (raw + processed are regenerated from source, keep out of git)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# MLflow / checkpoints (tracked remotely via DagsHub instead)
+mlruns/
+checkpoints/*
+!checkpoints/.gitkeep
+
+# Secrets
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editor
+.vscode/
+.idea/
+
+# Lockfile snapshot — keep this one, it's the reproducibility anchor
+!requirements-lock.txt
+
+
+#Research
 *.docx
 *.pdf
-*.md
+*.tex

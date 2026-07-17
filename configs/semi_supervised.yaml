@@ -1,0 +1,15 @@
+extends: base.yaml
+
+mlflow:
+  experiment_name: semi-supervised-vae
+
+model:
+  type: semi_supervised
+  latent_dim: 16
+  hidden_dims: [128, 64, 32]
+  input_length: 250
+  beta: 4.0
+  num_classes: 5              # MIT-BIH beat classes (adjust to your label scheme)
+  label_ratio: 0.1            # fraction of training data treated as labeled
+  classifier_hidden: 32
+  classification_weight: 1.0  # weight of classification loss term vs ELBO

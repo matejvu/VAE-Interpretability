@@ -1,0 +1,11 @@
+extends: base.yaml
+
+mlflow:
+  experiment_name: beta-vae
+
+model:
+  type: beta_vae
+  latent_dim: 16
+  hidden_dims: [128, 64, 32]
+  input_length: 250
+  beta: 4.0                  # KL weight; sweep this for your ablation study

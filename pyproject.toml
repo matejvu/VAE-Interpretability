@@ -1,0 +1,29 @@
+[project]
+name = "ecgvae"
+version = "0.1.0"
+description = "Semi-supervised disentangled VAE for interpretable ECG arrhythmia detection"
+requires-python = ">=3.10"
+dependencies = [
+    "mlflow>=2.10",
+    "numpy",
+    "scipy",
+    "pandas",
+    "scikit-learn",
+    "wfdb",
+    "pyyaml",
+    "matplotlib",
+    "umap-learn",
+    # torch is intentionally NOT pinned here — install separately with the
+    # correct CUDA build for your machine, e.g.:
+    #   pip install torch --index-url https://download.pytorch.org/whl/cu121
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "jupyter", "ruff", "black"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
