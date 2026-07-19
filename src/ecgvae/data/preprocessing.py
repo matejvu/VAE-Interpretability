@@ -124,9 +124,17 @@ def filter_mlii_channel0(pn_dir="mitdb", local_dir=None, verbose=True,
 
 # Window size around R-peak, in samples, at the native 360 Hz sampling rate.
 # Asymmetric: more room after R to capture the T-wave.
+# Extracted DIRECTLY at the target length (256, conv-friendly) -- no padding.
+# Ratio (~100:156, ~39:61) follows an anatomically-derived convention: cover
+# the PR interval upper bound (~0.20s) plus QRS onset before R, and the
+# remaining QRS + full ST segment + T-wave (bounded by QT interval upper
+# bound, ~0.44s) after R, so no beat's PQRST information gets clipped
+# regardless of individual variation (cf. upper-bound-interval segmentation
+# used in Self-ONN ECG classification literature, ~250ms/390ms at 360 Hz,
+# scaled here to hit exactly 256 samples).
 WINDOW_PRE = 100   # ~0.278 s before R-peak
-WINDOW_POST = 144  # ~0.400 s after R-peak
-WINDOW_LEN = WINDOW_PRE + WINDOW_POST  # 244 samples
+WINDOW_POST = 156  # ~0.433 s after R-peak
+WINDOW_LEN = WINDOW_PRE + WINDOW_POST  # 256 samples, no padding needed
 
 # AAMI EC57 superclass mapping. Symbols not in this dict are treated as
 # non-beat annotations (rhythm/quality markers etc.) and skipped entirely.
@@ -145,7 +153,7 @@ def extract_beat_windows(record_id, patient_id, raw_dir,
     Extract fixed-length windows around every annotated beat in one record.
 
     Returns:
-        windows: list of np.ndarray, each shape (w_pre + w_post,)
+        windows: list of np.ndarray, each shape (WINDOW_LEN,) = (w_pre + w_post,)
         meta_rows: list of dicts, one per window, aligned with `windows`
         n_dropped_boundary: int, beats skipped because window ran off the edge
         n_skipped_nonbeat: int, annotations skipped because not a beat symbol
