@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "jupyter", "ruff", "black"]
+dev = ["pytest", "jupyter", "ipykernel", "ruff", "black"]
 
 [build-system]
 requires = ["setuptools>=61.0"]
