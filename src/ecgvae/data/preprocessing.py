@@ -146,6 +146,13 @@ AAMI_MAP = {
     "/": "Q", "f": "Q", "Q": "Q",
 }
 
+# Q class (paced / unclassifiable beats) is excluded by default: after
+# dropping the 4 paced-heavy records, remaining Q-labeled beats are too few
+# (~15 in the full filtered dataset) to be statistically meaningful for any
+# split, sampling, or per-class evaluation. Set False to keep them (e.g. as
+# a documented edge-case curiosity, not for quantitative evaluation).
+EXCLUDE_Q_CLASS = True
+
 
 def extract_beat_windows(record_id, patient_id, raw_dir,
                           w_pre=WINDOW_PRE, w_post=WINDOW_POST, verbose=True):
@@ -157,6 +164,7 @@ def extract_beat_windows(record_id, patient_id, raw_dir,
         meta_rows: list of dicts, one per window, aligned with `windows`
         n_dropped_boundary: int, beats skipped because window ran off the edge
         n_skipped_nonbeat: int, annotations skipped because not a beat symbol
+        n_skipped_qclass: int, beats skipped because AAMI label is Q (excluded)
     """
     rec_path = str(Path(raw_dir) / record_id)
     record = wfdb.rdrecord(rec_path)
@@ -169,11 +177,16 @@ def extract_beat_windows(record_id, patient_id, raw_dir,
     meta_rows = []
     n_dropped_boundary = 0
     n_skipped_nonbeat = 0
+    n_skipped_qclass = 0
 
     for sample_idx, symbol in zip(ann.sample, ann.symbol):
         aami_label = AAMI_MAP.get(symbol, None)
         if aami_label is None:
             n_skipped_nonbeat += 1
+            continue
+
+        if EXCLUDE_Q_CLASS and aami_label == "Q":
+            n_skipped_qclass += 1
             continue
 
         start = sample_idx - w_pre
@@ -199,9 +212,10 @@ def extract_beat_windows(record_id, patient_id, raw_dir,
     if verbose:
         print(f"  {record_id}: {len(windows)} beats kept, "
               f"{n_dropped_boundary} dropped (boundary), "
-              f"{n_skipped_nonbeat} skipped (non-beat annotation)")
+              f"{n_skipped_nonbeat} skipped (non-beat annotation), "
+              f"{n_skipped_qclass} skipped (Q class excluded)")
 
-    return windows, meta_rows, n_dropped_boundary, n_skipped_nonbeat
+    return windows, meta_rows, n_dropped_boundary, n_skipped_nonbeat, n_skipped_qclass
 
 
 def build_beat_dataset(filtered_records, raw_dir, verbose=True):
@@ -210,15 +224,17 @@ def build_beat_dataset(filtered_records, raw_dir, verbose=True):
     all_meta = []
     total_dropped_boundary = 0
     total_skipped_nonbeat = 0
+    total_skipped_qclass = 0
 
     for rec in filtered_records:
-        windows, meta_rows, n_drop, n_skip = extract_beat_windows(
+        windows, meta_rows, n_drop, n_skip, n_skip_q = extract_beat_windows(
             rec["record_id"], rec["patient_id"], raw_dir, verbose=verbose
         )
         all_windows.extend(windows)
         all_meta.extend(meta_rows)
         total_dropped_boundary += n_drop
         total_skipped_nonbeat += n_skip
+        total_skipped_qclass += n_skip_q
 
     windows_array = np.stack(all_windows, axis=0) if all_windows else np.empty((0, WINDOW_LEN))
 
@@ -232,6 +248,7 @@ def build_beat_dataset(filtered_records, raw_dir, verbose=True):
         print(f"\nTotal beats extracted: {len(all_windows)}")
         print(f"Total dropped (boundary): {total_dropped_boundary}")
         print(f"Total skipped (non-beat annotation): {total_skipped_nonbeat}")
+        print(f"Total skipped (Q class excluded): {total_skipped_qclass}")
         print(f"Windows array shape: {windows_array.shape}")
 
     return windows_array, all_meta
