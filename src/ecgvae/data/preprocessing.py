@@ -2,10 +2,15 @@
 Stage 1: Filter MIT-BIH Arrhythmia Database records to those with MLII on channel 0.
 Stage 2: Extract fixed-length beat windows centered on annotated R-peaks for
          those records, with raw MIT-BIH symbol + AAMI EC57 class label.
+         Continuous signal is baseline-corrected (two-stage median filter)
+         before windowing. Windows are saved RAW (detrended, unscaled) --
+         normalization statistics are NOT computed here. They are computed
+         lazily, once, in the Dataset class constructor (see dataset.py),
+         only if/when normalization is actually requested.
 
 Outputs:
   data/processed/mlii_channel0_records.json   (stage 1)
-  data/processed/beat_windows.npy             (stage 2, shape (N, window_len), float32)
+  data/processed/beat_windows.npy             (stage 2, shape (N, window_len), float32, detrended but unscaled)
   data/processed/beat_metadata.csv            (stage 2, one row per window)
 """
 
@@ -15,10 +20,45 @@ import json
 import csv
 import numpy as np
 from pathlib import Path
+from scipy.signal import medfilt
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 RAW_DIR = PROJECT_ROOT / "data" / "raw" / "mit-bih-arrhythmia-database-1.0.0"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+
+
+def _odd_kernel_size(duration_s, fs):
+    """Convert a duration in seconds to an odd number of samples (required
+    by scipy.signal.medfilt kernel size)."""
+    n = int(round(duration_s * fs))
+    if n % 2 == 0:
+        n += 1
+    return max(n, 1)
+
+
+def remove_baseline_wander(signal, fs):
+    """
+    Two-stage median filter baseline wander removal (Sornmo & Laguna;
+    same technique used in Chumsaeng 2021, cited elsewhere in this
+    pipeline for patient-dependent normalization).
+
+    Stage 1: median filter with a ~200ms window removes the QRS complex
+    (narrower than the window), leaving P/T waves + baseline.
+    Stage 2: median filter with a ~600ms window on that result removes
+    P/T waves too (also narrower than this window), leaving a smooth
+    estimate of the baseline drift alone.
+    Subtracting that estimate from the original signal removes the drift
+    while leaving the PQRST morphology intact.
+
+    Must be applied to the CONTINUOUS per-record signal, before windowing
+    -- baseline wander is a slow (~0.15-0.3 Hz), continuous phenomenon
+    that can't be reliably estimated from a single ~0.7s beat window.
+    """
+    k1 = _odd_kernel_size(0.2, fs)  # ~200ms
+    k2 = _odd_kernel_size(0.6, fs)  # ~600ms
+    stage1 = medfilt(signal, kernel_size=k1)
+    baseline = medfilt(stage1, kernel_size=k2)
+    return signal - baseline
 
 # ---------------------------------------------------------------------------
 # Stage 1: record filtering
@@ -171,6 +211,7 @@ def extract_beat_windows(record_id, patient_id, raw_dir,
     ann = wfdb.rdann(rec_path, "atr")
 
     signal = record.p_signal[:, 0]  # channel 0, MLII (guaranteed by stage 1 filter)
+    signal = remove_baseline_wander(signal, fs=record.fs)
     sig_len = len(signal)
 
     windows = []
