@@ -2,7 +2,7 @@
 Stage 1: Filter MIT-BIH Arrhythmia Database records to those with MLII on channel 0.
 Stage 2: Extract fixed-length beat windows centered on annotated R-peaks for
          those records, with raw MIT-BIH symbol + AAMI EC57 class label.
-         Continuous signal is baseline-corrected (two-stage median filter)
+         Continuous signal is baseline-corrected (high-pass FIR filter)
          before windowing. Windows are saved RAW (detrended, unscaled) --
          normalization statistics are NOT computed here. They are computed
          lazily, once, in the Dataset class constructor (see dataset.py),
@@ -20,7 +20,7 @@ import json
 import csv
 import numpy as np
 from pathlib import Path
-from scipy.signal import medfilt
+from scipy.signal import firwin, filtfilt
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 RAW_DIR = PROJECT_ROOT / "data" / "raw" / "mit-bih-arrhythmia-database-1.0.0"
@@ -36,29 +36,25 @@ def _odd_kernel_size(duration_s, fs):
     return max(n, 1)
 
 
-def remove_baseline_wander(signal, fs):
+def remove_baseline_wander(signal, fs, cutoff=0.5, numtaps=401):
     """
-    Two-stage median filter baseline wander removal (Sornmo & Laguna;
-    same technique used in Chumsaeng 2021, cited elsewhere in this
-    pipeline for patient-dependent normalization).
+    High-pass FIR filter to remove baseline wander.
 
-    Stage 1: median filter with a ~200ms window removes the QRS complex
-    (narrower than the window), leaving P/T waves + baseline.
-    Stage 2: median filter with a ~600ms window on that result removes
-    P/T waves too (also narrower than this window), leaving a smooth
-    estimate of the baseline drift alone.
-    Subtracting that estimate from the original signal removes the drift
-    while leaving the PQRST morphology intact.
+    cutoff: Hz, below this is considered baseline wander (default 0.5 Hz is
+        standard for ECG baseline wander removal).
+    numtaps: filter length; must be odd for a Type I linear-phase FIR
+        high-pass. Larger = sharper cutoff, but needs more signal padding
+        at the edges (filtfilt requires len(signal) > 3 * numtaps).
+
+    Applied zero-phase (filtfilt) so the cutoff doesn't shift or smear
+    QRS timing/morphology, unlike a single-pass IIR/FIR filter would.
 
     Must be applied to the CONTINUOUS per-record signal, before windowing
     -- baseline wander is a slow (~0.15-0.3 Hz), continuous phenomenon
     that can't be reliably estimated from a single ~0.7s beat window.
     """
-    k1 = _odd_kernel_size(0.2, fs)  # ~200ms
-    k2 = _odd_kernel_size(0.6, fs)  # ~600ms
-    stage1 = medfilt(signal, kernel_size=k1)
-    baseline = medfilt(stage1, kernel_size=k2)
-    return signal - baseline
+    fir_coeff = firwin(numtaps, cutoff, fs=fs, pass_zero=False)  # high-pass
+    return filtfilt(fir_coeff, [1.0], signal)
 
 # ---------------------------------------------------------------------------
 # Stage 1: record filtering
