@@ -3,14 +3,17 @@ base_vae.py
 
 Abstract base class for all VAE variants (VanillaVAE, BetaVAE,
 SemiSupervisedVAE, ...). Defines the encode / reparameterize / decode /
-forward / loss_function contract so the trainer (see training/trainer.py)
-can work with any subclass interchangeably, regardless of encoder/decoder
-architecture or loss composition.
+forward contract so the Trainer (see training/trainer.py) can work with
+any subclass interchangeably, regardless of encoder/decoder architecture.
 
 Subclasses must implement:
   - encode(x)                    -> (mu, logvar)
   - decode(z)                    -> reconstruction
-  - loss_function(x, outputs)    -> dict of loss terms, must include "loss"
+
+Loss computation is NOT part of this contract -- it's the Trainer's job
+(see training/trainer.py, which composes the term primitives in
+training/losses.py), not the model's. forward() below just returns the
+raw ingredients (recon, mu, logvar, z) the Trainer needs.
 
 The reparameterization trick, forward pass, prior sampling, and
 deterministic reconstruction are identical across variants (same isotropic
@@ -39,8 +42,6 @@ class BaseVAE(nn.Module):
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         """Map latent z, shape (B, latent_dim), to a reconstruction, shape (B, input_length)."""
         raise NotImplementedError
-
-    
 
     def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
         """Sample z ~ N(mu, sigma^2) via the reparameterization trick (differentiable)."""

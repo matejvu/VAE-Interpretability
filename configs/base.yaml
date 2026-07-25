@@ -3,9 +3,9 @@
 
 data:
   dataset: mitbih
-  data_dir: data/processed/v1_bandpass_seg250   # points at a specific
-                                                  # versioned preprocessing
-                                                  # output (see preprocessing.py)
+  data_dir: data/processed   # ECGBeatDataset (mitbih.py) loads beat_windows.npy /
+                              # beat_metadata.csv directly from this fixed path --
+                              # this key is informational only, not read by the loader
   batch_size: 128
   val_split: 0.15
   sample_rate: 360

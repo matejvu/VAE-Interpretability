@@ -7,4 +7,4 @@ model:
   type: vanilla_vae
   latent_dim: 16
   hidden_dims: [128, 64, 32]
-  input_length: 250          # samples per ECG segment; must match preprocessing
+  input_length: 256
