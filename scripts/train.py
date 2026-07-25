@@ -29,7 +29,7 @@ from ecgvae.models.vanilla_vae import VanillaVAE
 from ecgvae.training.trainer import Trainer
 from ecgvae.utils.config import load_config
 from ecgvae.utils.device import get_device
-from ecgvae.utils.mlflow_utils import log_run_metadata, setup_mlflow
+from ecgvae.utils.mlflow_utils import log_run_metadata, register_trained_model, setup_mlflow
 from ecgvae.utils.seeding import set_seed
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -147,6 +147,12 @@ def train(config: dict) -> None:
         test_metrics = trainer.evaluate(loaders["test"], load_best=True)
         print(f"[test, best checkpoint] loss={test_metrics['loss']:.4f}")
         mlflow.log_metrics({f"test_{k}": v for k, v in test_metrics.items()})
+
+        # `model` now holds the best-val checkpoint's weights (evaluate()
+        # just loaded them) -- register exactly that, under model_type so
+        # different hyperparameters land as new versions of the same
+        # registered model rather than separate ones.
+        register_trained_model(model, config["model"]["type"], config)
 
 
 def main():

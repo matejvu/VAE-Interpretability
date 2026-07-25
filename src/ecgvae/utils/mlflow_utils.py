@@ -2,6 +2,8 @@
 import os
 import subprocess
 import mlflow
+import mlflow.pytorch
+from mlflow import MlflowClient
 
 from ecgvae.utils.config import flatten
 
@@ -40,3 +42,41 @@ def log_run_metadata(config: dict, data_version: str | None = None) -> None:
     elif "data_dir" in config.get("data", {}):
         # fall back to inferring from the folder name, e.g. .../v2_wavelet_seg360
         mlflow.set_tag("data_version", os.path.basename(config["data"]["data_dir"]))
+
+
+def register_trained_model(model, model_type: str, config: dict) -> None:
+    """Register `model` (should already hold the checkpoint to keep, e.g.
+    Trainer's best-val weights) as a new version under `model_type` in the
+    Model Registry. Tags describe the model itself (architecture/size),
+    not run performance -- that's already on the linked run."""
+    # pickle, not the "pt2" (torch.export) default -- pt2 needs a traced
+    # single-tensor signature, and forward() here returns a dict.
+    model_info = mlflow.pytorch.log_model(
+        model, name="model", registered_model_name=model_type, serialization_format="pickle"
+    )
+    version = model_info.registered_model_version
+
+    client = MlflowClient()
+    model_cfg = config["model"]
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    # hidden_dims omitted: it's VanillaVAE-specific, not part of the
+    # BaseVAE contract every variant shares (input_length/latent_dim are).
+    client.update_model_version(
+        name=model_type,
+        version=version,
+        description=(
+            f"{model_type} -- input_length={model_cfg.get('input_length')}, "
+            f"latent_dim={model_cfg.get('latent_dim')}, total_params={total_params:,}"
+        ),
+    )
+
+    tags = {
+        "input_length": model_cfg.get("input_length"),
+        "latent_dim": model_cfg.get("latent_dim"),
+        "total_params": total_params,
+        "trainable_params": trainable_params,
+    }
+    for key, value in tags.items():
+        client.set_model_version_tag(name=model_type, version=version, key=key, value=str(value))
