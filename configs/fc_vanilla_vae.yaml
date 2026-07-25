@@ -1,0 +1,12 @@
+extends: base.yaml
+
+mlflow:
+  experiment_name: vanilla-vae
+
+model:
+  type: fc_vanilla_vae
+  latent_dim: 16
+  hidden_dims: [144, 72, 36]   # ~100k total params (FC layers are dense,
+                                # so this is much narrower than VanillaVAE's
+                                # conv hidden_dims for a comparable size)
+  input_length: 256

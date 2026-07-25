@@ -11,10 +11,11 @@ which config, which dataloaders, mlflow -- Trainer owns none of it.
 Usage:
     python scripts/train.py --config configs/vanilla_vae.yaml
 
-Only "vanilla_vae" is runnable today -- BetaVAE and SemiSupervisedVAE
-(configs/beta_vae.yaml, configs/semi_supervised.yaml) are still empty
-stub files in src/ecgvae/models/, so selecting those configs raises
-NotImplementedError instead of silently doing the wrong thing.
+"vanilla_vae" and "fc_vanilla_vae" are runnable today -- BetaVAE and
+SemiSupervisedVAE (configs/beta_vae.yaml, configs/semi_supervised.yaml)
+are still empty stub files in src/ecgvae/models/, so selecting those
+configs raises NotImplementedError instead of silently doing the wrong
+thing.
 """
 
 import argparse
@@ -25,6 +26,7 @@ import torch
 from dotenv import load_dotenv
 
 from ecgvae.data.mitbih import build_dataloaders
+from ecgvae.models.fc_vanilla_vae import FCVanillaVAE
 from ecgvae.models.vanilla_vae import VanillaVAE
 from ecgvae.training.trainer import Trainer
 from ecgvae.utils.config import load_config
@@ -45,6 +47,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 # stub files, so their configs aren't runnable yet.
 MODEL_REGISTRY = {
     "vanilla_vae": VanillaVAE,
+    "fc_vanilla_vae": FCVanillaVAE,
 }
 
 OPTIMIZER_REGISTRY = {
