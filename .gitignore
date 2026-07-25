@@ -12,6 +12,7 @@ data/processed/*
 
 # MLflow / checkpoints (tracked remotely via DagsHub instead)
 mlruns/
+mlflow.db
 checkpoints/*
 !checkpoints/.gitkeep
 

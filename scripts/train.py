@@ -22,6 +22,7 @@ from pathlib import Path
 
 import mlflow
 import torch
+from dotenv import load_dotenv
 
 from ecgvae.data.mitbih import build_dataloaders
 from ecgvae.models.vanilla_vae import VanillaVAE
@@ -33,6 +34,11 @@ from ecgvae.utils.seeding import set_seed
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints"
+
+# Load PROJECT_ROOT/.env (e.g. MLFLOW_TRACKING_URI) explicitly by absolute
+# path -- not just load_dotenv()'s cwd-relative default -- so it's found
+# regardless of which directory this script is launched from.
+load_dotenv(PROJECT_ROOT / ".env")
 
 # Only variants with an actual implementation in src/ecgvae/models/ are
 # listed here. beta_vae.py and semi_supervised.py are currently empty
@@ -90,9 +96,14 @@ def make_epoch_logger():
     def on_epoch_end(epoch, train_metrics, val_metrics):
         print(
             f"[epoch {epoch:03d}] "
-            f"train_loss={train_metrics['loss']:.4f}  "
-            f"val_loss={val_metrics['loss']:.4f}"
+            f"train_loss={train_metrics['loss']:.4f} "
+            f"(recon={train_metrics['recon_loss']:.4f}, kl={train_metrics['kl_loss']:.4f})  "
+            f"val_loss={val_metrics['loss']:.4f} "
+            f"(recon={val_metrics['recon_loss']:.4f}, kl={val_metrics['kl_loss']:.4f})"
         )
+        # train_metrics/val_metrics already carry recon_loss/kl_loss alongside
+        # loss (see Trainer._compute_loss), so this logs all three per split --
+        # train_recon_loss, train_kl_loss, val_recon_loss, val_kl_loss, etc.
         mlflow.log_metrics({f"train_{k}": v for k, v in train_metrics.items()}, step=epoch)
         mlflow.log_metrics({f"val_{k}": v for k, v in val_metrics.items()}, step=epoch)
 

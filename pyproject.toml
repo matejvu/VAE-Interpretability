@@ -5,6 +5,8 @@ description = "Semi-supervised disentangled VAE for interpretable ECG arrhythmia
 requires-python = ">=3.10"
 dependencies = [
     "mlflow>=2.10",
+    "python-dotenv",   # loads .env (MLFLOW_TRACKING_URI etc.) into the
+                        # environment automatically -- see scripts/train.py
     "numpy",
     "scipy",
     "pandas",
