@@ -6,7 +6,7 @@ data:
   data_dir: data/processed   # ECGBeatDataset (mitbih.py) loads beat_windows.npy /
                               # beat_metadata.csv directly from this fixed path --
                               # this key is informational only, not read by the loader
-  batch_size: 512
+  batch_size: 4096
   sample_rate: 360
   num_workers: 4
 
@@ -19,7 +19,7 @@ training:
   device: cuda          # "cuda" or "cpu" — falls back to cpu automatically
                           # if cuda unavailable
   checkpoint_every: 5   # epochs; best-val checkpoint is always also saved
-  early_stopping_patience: 35
+  early_stopping_patience: 15
 
 mlflow:
   experiment_name: base   # set per-variant, e.g. "vanilla-vae"
