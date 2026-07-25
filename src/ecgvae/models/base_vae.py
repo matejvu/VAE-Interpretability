@@ -18,13 +18,13 @@ Gaussian prior/posterior family), so they're implemented once here instead
 of being duplicated in every subclass.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 import torch
 import torch.nn as nn
 
 
-class BaseVAE(nn.Module, ABC):
+class BaseVAE(nn.Module):
     def __init__(self, input_length: int, latent_dim: int):
         super().__init__()
         self.input_length = input_length
