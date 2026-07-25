@@ -56,6 +56,11 @@ def register_trained_model(model, model_type: str, config: dict) -> None:
     )
     version = model_info.registered_model_version
 
+    # Full layer-by-layer structure (nn.Module's own __repr__) -- too long
+    # for the version description below, so it goes alongside the model
+    # files as an artifact instead.
+    mlflow.log_text(str(model), "model/architecture.txt")
+
     client = MlflowClient()
     model_cfg = config["model"]
     total_params = sum(p.numel() for p in model.parameters())

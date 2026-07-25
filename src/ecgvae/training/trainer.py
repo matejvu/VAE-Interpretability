@@ -22,6 +22,7 @@ of the caller (see scripts/train.py), via plain constructor args and the
 optional `on_epoch_end` callback.
 """
 
+import time
 from pathlib import Path
 
 import torch
@@ -102,18 +103,23 @@ class Trainer:
         """
         Run up to `epochs` epochs of train/val, tracking the best-val
         checkpoint and (optionally) stopping early. `on_epoch_end`, if
-        given, is called as on_epoch_end(epoch, train_metrics, val_metrics)
+        given, is called as
+        on_epoch_end(epoch, train_metrics, val_metrics, epoch_time)
         after each epoch -- e.g. for experiment-tracker logging or
         printing, which this class deliberately doesn't do itself.
+        `epoch_time` is wall-clock seconds for that epoch's train+val
+        passes (excludes checkpoint I/O, which happens after the callback).
         """
         epochs_without_improvement = 0
 
         for epoch in range(1, epochs + 1):
+            start_time = time.perf_counter()
             train_metrics = self._run_epoch(train_loader, train_mode=True)
             val_metrics = self._run_epoch(val_loader, train_mode=False)
+            epoch_time = time.perf_counter() - start_time
 
             if on_epoch_end is not None:
-                on_epoch_end(epoch, train_metrics, val_metrics)
+                on_epoch_end(epoch, train_metrics, val_metrics, epoch_time)
 
             val_loss = val_metrics["loss"]
             if val_loss < self.best_val_loss:
