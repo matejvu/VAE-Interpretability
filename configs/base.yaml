@@ -20,6 +20,9 @@ training:
                           # if cuda unavailable
   checkpoint_every: 5   # epochs; best-val checkpoint is always also saved
   early_stopping_patience: 15
+  kl_annealing_epochs: 20   # linearly ramp KL weight 0 -> 1 over this many
+                              # epochs (counters posterior collapse); set to
+                              # 0 to disable (full KL weight from epoch 1)
 
 mlflow:
   experiment_name: base   # set per-variant, e.g. "vanilla-vae"

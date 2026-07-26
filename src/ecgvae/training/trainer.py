@@ -11,9 +11,9 @@ specifically. It only requires:
     (see `input_key`).
 
 Loss computation is this class's job, not the model's: `_compute_loss`
-composes the term primitives in training/losses.py into the standard,
-unweighted ELBO. That's the only composition currently needed (only
-VanillaVAE is implemented); a future variant needing a different
+composes the term primitives in training/losses.py into the standard ELBO,
+with an optional linearly-annealed KL weight (see `kl_annealing_epochs`)
+to counter posterior collapse. A future variant needing a different
 composition (beta-weighted KL, a classification term, ...) means
 extending `_compute_loss`, not adding a method back onto the model.
 
@@ -40,6 +40,7 @@ class Trainer:
         checkpoint_every=10,
         early_stopping_patience=None,
         input_key="waveform",
+        kl_annealing_epochs=0,
     ):
         self.model = model
         self.optimizer = optimizer
@@ -49,6 +50,9 @@ class Trainer:
         self.checkpoint_every = checkpoint_every
         self.early_stopping_patience = early_stopping_patience
         self.input_key = input_key
+        # 0/falsy disables annealing (full KL weight from epoch 1, the
+        # previous behavior). See _kl_weight_for_epoch.
+        self.kl_annealing_epochs = kl_annealing_epochs
 
         self.best_val_loss = float("inf")
 
@@ -56,17 +60,27 @@ class Trainer:
         x = batch[self.input_key] if isinstance(batch, dict) else batch
         return x.to(self.device)
 
-    def _compute_loss(self, x, outputs):
-        """Standard, unweighted ELBO: reconstruction + KL to N(0, I)."""
+    def _kl_weight_for_epoch(self, epoch):
+        """Linear KL-annealing schedule: ramps 0 -> 1 over the first
+        kl_annealing_epochs epochs, then holds at 1."""
+        if not self.kl_annealing_epochs:
+            return 1.0
+        return min(1.0, epoch / self.kl_annealing_epochs)
+
+    def _compute_loss(self, x, outputs, kl_weight=1.0):
+        """ELBO: reconstruction + kl_weight * KL to N(0, I). kl_loss here is
+        always the raw, unweighted KL (for diagnostics/comparability) --
+        kl_weight only scales its contribution to `loss`, the actual
+        optimized objective."""
         recon_loss = reconstruction_loss(outputs["recon"], x)
         kl_loss = kl_divergence(outputs["mu"], outputs["logvar"])
         return {
-            "loss": recon_loss + kl_loss,
+            "loss": recon_loss + kl_weight * kl_loss,
             "recon_loss": recon_loss,
             "kl_loss": kl_loss,
         }
 
-    def _run_epoch(self, loader, train_mode):
+    def _run_epoch(self, loader, train_mode, kl_weight=1.0):
         self.model.train(train_mode)
 
         totals = {}
@@ -75,7 +89,7 @@ class Trainer:
             for batch in loader:
                 x = self._extract_input(batch)
                 outputs = self.model(x)
-                losses = self._compute_loss(x, outputs)
+                losses = self._compute_loss(x, outputs, kl_weight=kl_weight)
 
                 if train_mode:
                     self.optimizer.zero_grad()
@@ -104,18 +118,22 @@ class Trainer:
         Run up to `epochs` epochs of train/val, tracking the best-val
         checkpoint and (optionally) stopping early. `on_epoch_end`, if
         given, is called as
-        on_epoch_end(epoch, train_metrics, val_metrics, epoch_time)
+        on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, kl_weight)
         after each epoch -- e.g. for experiment-tracker logging or
         printing, which this class deliberately doesn't do itself.
         `epoch_time` is wall-clock seconds for that epoch's train+val
         passes (excludes checkpoint I/O, which happens after the callback).
+        `kl_weight` is this epoch's annealing weight (same value used for
+        both the train and val pass); train_metrics/val_metrics deliberately
+        don't carry it themselves -- it's not a per-split metric.
         """
         epochs_without_improvement = 0
 
         for epoch in range(1, epochs + 1):
+            kl_weight = self._kl_weight_for_epoch(epoch)
             start_time = time.perf_counter()
-            train_metrics = self._run_epoch(train_loader, train_mode=True)
-            val_metrics = self._run_epoch(val_loader, train_mode=False)
+            train_metrics = self._run_epoch(train_loader, train_mode=True, kl_weight=kl_weight)
+            val_metrics = self._run_epoch(val_loader, train_mode=False, kl_weight=kl_weight)
             epoch_time = time.perf_counter() - start_time
 
             # PER DIM KL to check
@@ -132,7 +150,7 @@ class Trainer:
 
 
             if on_epoch_end is not None:
-                on_epoch_end(epoch, train_metrics, val_metrics, epoch_time)
+                on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, kl_weight)
 
             val_loss = val_metrics["loss"]
             if val_loss < self.best_val_loss:
