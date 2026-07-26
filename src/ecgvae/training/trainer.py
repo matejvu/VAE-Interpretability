@@ -27,6 +27,7 @@ from pathlib import Path
 
 import torch
 
+from ecgvae.evaluation.metrics import per_dim_kl, prd
 from ecgvae.training.losses import kl_divergence, reconstruction_loss
 
 
@@ -80,7 +81,23 @@ class Trainer:
             "kl_loss": kl_loss,
         }
 
-    def _run_epoch(self, loader, train_mode, kl_weight=1.0):
+    def _count_active_units(self, val_loader, threshold=0.02):
+        """Posterior-collapse diagnostic: how many latent dims have per-dim
+        KL above `threshold`, averaged over one batch from val_loader (val
+        only -- this is a snapshot of the current model, not a training
+        signal, so a train-set version isn't needed)."""
+        self.model.eval()
+        with torch.no_grad():
+            x = self._extract_input(next(iter(val_loader)))
+            mu, logvar = self.model.encode(x)
+            kl_dims = per_dim_kl(mu, logvar)
+            active = (kl_dims > threshold).sum().item()
+        self.model.train()
+        print(f"\tactive_units: {active}")
+        print(f"\tkl_per_dim: {kl_dims}")
+        return active
+
+    def _run_epoch(self, loader, train_mode, kl_weight=1.0, compute_prd=False):
         self.model.train(train_mode)
 
         totals = {}
@@ -95,6 +112,12 @@ class Trainer:
                     self.optimizer.zero_grad()
                     losses["loss"].backward()
                     self.optimizer.step()
+
+                if compute_prd:
+                    # Reconstruction-quality check (see evaluation/metrics.prd),
+                    # not part of the optimized objective -- only computed by
+                    # evaluate(), never during fit()'s per-epoch train/val passes.
+                    losses["prd"] = prd(outputs["recon"], x)
 
                 for key, value in losses.items():
                     totals[key] = totals.get(key, 0.0) + value.item()
@@ -118,7 +141,7 @@ class Trainer:
         Run up to `epochs` epochs of train/val, tracking the best-val
         checkpoint and (optionally) stopping early. `on_epoch_end`, if
         given, is called as
-        on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, kl_weight)
+        on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, kl_weight, active_units)
         after each epoch -- e.g. for experiment-tracker logging or
         printing, which this class deliberately doesn't do itself.
         `epoch_time` is wall-clock seconds for that epoch's train+val
@@ -126,6 +149,8 @@ class Trainer:
         `kl_weight` is this epoch's annealing weight (same value used for
         both the train and val pass); train_metrics/val_metrics deliberately
         don't carry it themselves -- it's not a per-split metric.
+        `active_units` is the val-only posterior-collapse diagnostic (see
+        _count_active_units) -- also not a per-split metric.
         """
         epochs_without_improvement = 0
 
@@ -136,21 +161,10 @@ class Trainer:
             val_metrics = self._run_epoch(val_loader, train_mode=False, kl_weight=kl_weight)
             epoch_time = time.perf_counter() - start_time
 
-            # PER DIM KL to check
-            self.model.eval()
-            with torch.no_grad():
-                x = self._extract_input(next(iter(val_loader)))
-                mu, logvar = self.model.encode(x)
-                kl_dims = (-0.5 * (1 + logvar - mu.pow(2) - logvar.exp())).mean(dim=0)
-                active = (kl_dims > 0.02).sum().item()
-            self.model.train()
-            print(f"\tactive_units: {active}")
-            print(f"\tkl_per_dim: {kl_dims}")
-            #==============================
-
+            active_units = self._count_active_units(val_loader)
 
             if on_epoch_end is not None:
-                on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, kl_weight)
+                on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, kl_weight, active_units)
 
             val_loss = val_metrics["loss"]
             if val_loss < self.best_val_loss:
@@ -176,9 +190,9 @@ class Trainer:
         return self.best_val_loss
 
     def evaluate(self, loader, load_best=True):
-        """Run one no-grad pass over `loader`. Loads checkpoint_dir/best.pt
-        first unless load_best=False (e.g. to evaluate the in-memory model
-        as-is)."""
+        """Run one no-grad pass over `loader`, including PRD alongside
+        loss/recon_loss/kl_loss. Loads checkpoint_dir/best.pt first unless
+        load_best=False (e.g. to evaluate the in-memory model as-is)."""
         if load_best:
             self.load_checkpoint(self.checkpoint_dir / "best.pt")
-        return self._run_epoch(loader, train_mode=False)
+        return self._run_epoch(loader, train_mode=False, compute_prd=True)

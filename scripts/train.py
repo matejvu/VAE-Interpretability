@@ -96,7 +96,7 @@ def make_epoch_logger():
     """mlflow + stdout logging callback for Trainer.fit(on_epoch_end=...).
     Kept here (not in Trainer) since Trainer knows nothing about mlflow."""
 
-    def on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, kl_weight):
+    def on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, kl_weight, active_units):
         print(
             f"[epoch {epoch:03d}] "
             f"train_loss={train_metrics['loss']:.4f} "
@@ -112,6 +112,9 @@ def make_epoch_logger():
         mlflow.log_metrics({f"train_{k}": v for k, v in train_metrics.items()}, step=epoch)
         mlflow.log_metrics({f"val_{k}": v for k, v in val_metrics.items()}, step=epoch)
         mlflow.log_metric("epoch_time_sec", epoch_time, step=epoch)
+        # val-only diagnostic (see Trainer._count_active_units) -- not a
+        # per-split metric, logged standalone like epoch_time_sec.
+        mlflow.log_metric("active_units", active_units, step=epoch)
 
     return on_epoch_end
 

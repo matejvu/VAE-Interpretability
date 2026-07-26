@@ -1,0 +1,14 @@
+# Sweep-spec, read by scripts/sweep.py -- NOT the same schema as
+# configs/*.yaml (train.py won't load this directly).
+
+base_config: configs/vanilla_vae.yaml
+
+# Overwrites mlflow.experiment_name from base_config for every run this
+# sweep launches, so results land in their own experiment, separate from
+# regular (non-sweep) vanilla_vae runs.
+experiment_name: vanilla-vae-sweep
+
+grid:
+  training.lr: [0.001, 0.0001]
+  model.latent_dim: [8, 16, 24]
+  # training.kl_annealing_epochs: [0, 20, 35]
