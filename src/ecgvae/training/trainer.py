@@ -118,6 +118,19 @@ class Trainer:
             val_metrics = self._run_epoch(val_loader, train_mode=False)
             epoch_time = time.perf_counter() - start_time
 
+            # PER DIM KL to check
+            self.model.eval()
+            with torch.no_grad():
+                x = self._extract_input(next(iter(val_loader)))
+                mu, logvar = self.model.encode(x)
+                kl_dims = (-0.5 * (1 + logvar - mu.pow(2) - logvar.exp())).mean(dim=0)
+                active = (kl_dims > 0.02).sum().item()
+            self.model.train()
+            print(f"\tactive_units: {active}")
+            print(f"\tkl_per_dim: {kl_dims}")
+            #==============================
+
+
             if on_epoch_end is not None:
                 on_epoch_end(epoch, train_metrics, val_metrics, epoch_time)
 
