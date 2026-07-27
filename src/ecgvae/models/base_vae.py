@@ -9,11 +9,15 @@ any subclass interchangeably, regardless of encoder/decoder architecture.
 Subclasses must implement:
   - encode(x)                    -> (mu, logvar)
   - decode(z)                    -> reconstruction
+  - loss_function(x, outputs)    -> dict of loss terms, must include "loss"
 
-Loss computation is NOT part of this contract -- it's the Trainer's job
-(see training/trainer.py, which composes the term primitives in
-training/losses.py), not the model's. forward() below just returns the
-raw ingredients (recon, mu, logvar, z) the Trainer needs.
+Loss composition is each model's own responsibility, not Trainer's --
+Trainer just calls model.loss_function(x, outputs) and doesn't know or
+care what's inside it. That's what makes Trainer able to train any
+subclass interchangeably regardless of loss shape (unweighted ELBO,
+beta-weighted KL, free-bits, a classification term, ...). Compose from
+the term primitives in training/losses.py rather than reimplementing
+reconstruction/KL math in each subclass.
 
 The reparameterization trick, forward pass, prior sampling, and
 deterministic reconstruction are identical across variants (same isotropic
@@ -41,6 +45,16 @@ class BaseVAE(nn.Module):
     @abstractmethod
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         """Map latent z, shape (B, latent_dim), to a reconstruction, shape (B, input_length)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def loss_function(
+        self, x: torch.Tensor, outputs: dict[str, torch.Tensor], **kwargs
+    ) -> dict[str, torch.Tensor]:
+        """Compute this variant's loss from x and forward()'s outputs dict.
+        Must return a dict including a "loss" key (the tensor Trainer calls
+        .backward() on); any other keys (recon_loss, kl_loss, ...) are
+        reported as metrics but not otherwise used by Trainer."""
         raise NotImplementedError
 
     def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:

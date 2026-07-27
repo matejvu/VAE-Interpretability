@@ -11,4 +11,3 @@ experiment_name: vanilla-vae-sweep
 grid:
   training.lr: [0.001, 0.0001]
   model.latent_dim: [8, 16, 24]
-  # training.kl_annealing_epochs: [0, 20, 35]

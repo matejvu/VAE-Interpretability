@@ -96,19 +96,17 @@ def make_epoch_logger():
     """mlflow + stdout logging callback for Trainer.fit(on_epoch_end=...).
     Kept here (not in Trainer) since Trainer knows nothing about mlflow."""
 
-    def on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, kl_weight, active_units):
+    def on_epoch_end(epoch, train_metrics, val_metrics, epoch_time, active_units):
         print(
             f"[epoch {epoch:03d}] "
             f"train_loss={train_metrics['loss']:.4f} "
             f"(recon={train_metrics['recon_loss']:.4f}, kl={train_metrics['kl_loss']:.4f})  "
             f"val_loss={val_metrics['loss']:.4f} "
             f"(recon={val_metrics['recon_loss']:.4f}, kl={val_metrics['kl_loss']:.4f})  "
-            f"kl_weight={kl_weight:.2f}  "
             f"time={epoch_time:.2f}s"
         )
         # train_metrics/val_metrics carry recon_loss/kl_loss alongside loss
-        # (see Trainer._compute_loss) -- logs all three per split. kl_weight
-        # is deliberately not logged to mlflow (console only, per request).
+        # (see the model's loss_function) -- logs all three per split.
         mlflow.log_metrics({f"train_{k}": v for k, v in train_metrics.items()}, step=epoch)
         mlflow.log_metrics({f"val_{k}": v for k, v in val_metrics.items()}, step=epoch)
         mlflow.log_metric("epoch_time_sec", epoch_time, step=epoch)
@@ -140,7 +138,6 @@ def train(config: dict) -> None:
         checkpoint_dir=CHECKPOINT_DIR / config["mlflow"]["experiment_name"],
         checkpoint_every=config["training"]["checkpoint_every"],
         early_stopping_patience=config["training"]["early_stopping_patience"],
-        kl_annealing_epochs=config["training"]["kl_annealing_epochs"],
     )
 
     setup_mlflow(config)

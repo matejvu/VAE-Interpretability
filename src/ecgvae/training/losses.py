@@ -23,3 +23,12 @@ def reconstruction_loss(recon: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
 def kl_divergence(mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
     """Analytic KL( N(mu, sigma^2) || N(0, I) ), averaged over the batch."""
     return -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) / mu.size(0)
+
+def free_bits_kl_divergence(mu: torch.Tensor, logvar: torch.Tensor, lambda_bits: float = 0.1) -> torch.Tensor:
+    """Free-bits KL divergence (Kingma et al., 2016)."""
+    kl_per_dim = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp())
+    kl_per_dim_batch_mean = kl_per_dim.mean(dim=0)  # (latent_dim,)
+
+    kl_clamped = torch.clamp(kl_per_dim_batch_mean, min=lambda_bits)
+
+    return kl_clamped.sum()

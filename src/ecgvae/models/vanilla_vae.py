@@ -1,11 +1,11 @@
 """
 vanilla_vae.py
 
-Standard (unconditional) VAE: single Gaussian encoder/decoder pair. Loss
-computation (standard, unweighted ELBO) lives in the Trainer, not here --
-see training/trainer.py and training/losses.py.
+Standard (unconditional) VAE: single Gaussian encoder/decoder pair, with
+the original VAE paper's loss (Kingma & Welling, 2013) -- unweighted
+reconstruction + KL, no annealing/beta/free-bits.
 See BaseVAE (base_vae.py) for the shared reparameterize/forward/sample/
-reconstruct logic and the encode/decode contract.
+reconstruct logic and the encode/decode/loss_function contract.
 
 Encoder/decoder architecture is intentionally left unbuilt here --
 self.encoder / self.decoder are filled in by hand; encode()/decode() below
@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 
 from ecgvae.models.base_vae import BaseVAE
+from ecgvae.training.losses import kl_divergence, reconstruction_loss
 
 
 class VanillaVAE(BaseVAE):
@@ -69,3 +70,15 @@ class VanillaVAE(BaseVAE):
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         h = self.decoder_input(z)
         return self.decoder(h)
+
+    def loss_function(
+        self, x: torch.Tensor, outputs: dict[str, torch.Tensor], **kwargs
+    ) -> dict[str, torch.Tensor]:
+        """Original VAE ELBO: reconstruction + KL to N(0, I), unweighted."""
+        recon_loss = reconstruction_loss(outputs["recon"], x)
+        kl_loss = kl_divergence(outputs["mu"], outputs["logvar"])
+        return {
+            "loss": recon_loss + kl_loss,
+            "recon_loss": recon_loss,
+            "kl_loss": kl_loss,
+        }

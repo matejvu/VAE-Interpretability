@@ -16,6 +16,7 @@ import torch
 import torch.nn as nn
 
 from ecgvae.models.base_vae import BaseVAE
+from ecgvae.training.losses import kl_divergence, reconstruction_loss
 
 
 class FCVanillaVAE(BaseVAE):
@@ -54,3 +55,16 @@ class FCVanillaVAE(BaseVAE):
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         return self.decoder(z)
+
+    def loss_function(
+        self, x: torch.Tensor, outputs: dict[str, torch.Tensor], **kwargs
+    ) -> dict[str, torch.Tensor]:
+        """Same original-VAE ELBO as VanillaVAE (see vanilla_vae.py) --
+        unweighted reconstruction + KL. Only the architecture differs."""
+        recon_loss = reconstruction_loss(outputs["recon"], x)
+        kl_loss = kl_divergence(outputs["mu"], outputs["logvar"])
+        return {
+            "loss": recon_loss + kl_loss,
+            "recon_loss": recon_loss,
+            "kl_loss": kl_loss,
+        }
