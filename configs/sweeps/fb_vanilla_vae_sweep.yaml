@@ -11,10 +11,10 @@ experiment_name: fb-vanilla-vae-sweep
 grid:
   # training.lr: [0.001, 0.0001]
   # model.latent_dim: [16]
-  model.lambda_bits: [ 0.5]
+  model.lambda_bits: [ 1, 2]
   # Architecture options -- both are FBVanillaVAE constructor args (see
   # fb_vanilla_vae.py): base_channels sets the conv channel width (schedule
   # is base_channels * [1, 2, 4, 4, ...]), n_conv_layers sets encoder/decoder
   # depth (each layer halves/doubles the sequence length).
-  model.base_channels: [32, 64]
-  model.n_conv_layers: [3, 7]
+  model.base_channels: [16, 32]
+  model.n_conv_layers: [2, 3]
