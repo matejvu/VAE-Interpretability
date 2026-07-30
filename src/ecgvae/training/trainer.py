@@ -54,7 +54,7 @@ class Trainer:
         x = batch[self.input_key] if isinstance(batch, dict) else batch
         return x.to(self.device)
 
-    def _count_active_units(self, val_loader, threshold=0.02):
+    def _count_active_units(self, val_loader, threshold=0.5):
         """Posterior-collapse diagnostic: how many latent dims have per-dim
         KL above `threshold`, averaged over one batch from val_loader (val
         only -- this is a snapshot of the current model, not a training

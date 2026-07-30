@@ -1,0 +1,10 @@
+extends: base.yaml
+
+mlflow:
+  experiment_name: vanilla-vae
+
+model:
+  type: fb_vanilla_vae
+  latent_dim: 16
+  lambda_bits: 0.1
+  input_length: 256
