@@ -1,0 +1,12 @@
+extends: base.yaml
+
+mlflow:
+  experiment_name: fixed-channel-vae
+
+model:
+  type: fixed_channel_vae
+  latent_dim: 16
+  input_length: 256
+  gamma: 100.0   # weight on |KL - C| -- start high (per Burgess et al.,
+                  # 2018) and tune; this is the term actually enforced
+  C: 25.0        # target KL "capacity" in nats -- tune per latent_dim/data

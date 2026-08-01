@@ -26,8 +26,9 @@ import torch
 from dotenv import load_dotenv
 
 from ecgvae.data.mitbih import build_dataloaders
-from ecgvae.models.fc_vanilla_vae import FCVanillaVAE
 from ecgvae.models.fb_vanilla_vae import FBVanillaVAE
+from ecgvae.models.fc_vanilla_vae import FCVanillaVAE
+from ecgvae.models.fixed_channel_vae import FixedChannelVAE
 from ecgvae.models.vanilla_vae import VanillaVAE
 from ecgvae.training.trainer import Trainer
 from ecgvae.utils.config import load_config
@@ -50,6 +51,7 @@ MODEL_REGISTRY = {
     "vanilla_vae": VanillaVAE,
     "fc_vanilla_vae": FCVanillaVAE,
     "fb_vanilla_vae": FBVanillaVAE,
+    "fixed_channel_vae": FixedChannelVAE,
 }
 
 OPTIMIZER_REGISTRY = {

@@ -1,0 +1,22 @@
+# Sweep-spec, read by scripts/sweep.py -- NOT the same schema as
+# configs/*.yaml (train.py won't load this directly).
+
+base_config: configs/fixed_channel_vae.yaml
+
+# Overwrites mlflow.experiment_name from base_config for every run this
+# sweep launches, so results land in their own experiment, separate from
+# regular (non-sweep) fixed_channel_vae runs.
+experiment_name: fixed-channel-vae-sweep
+
+grid:
+  # gamma: weight on |KL - C| in the loss (recon + gamma * |KL - C|).
+  # Burgess et al. (2018) use large values so the constraint actually
+  # bites rather than being dominated by reconstruction -- 50/100/500
+  # spans "loosely enforced" to "strongly enforced".
+  model.gamma: [10.0, 50.0, 100.0]
+  # C: target KL "capacity" in nats, summed over all latent_dim=16 dims.
+  # 5 ~= a handful of weakly-active units; 50 ~= most/all 16 dims
+  # meaningfully active (based on the per-dim KL magnitudes -- usually a
+  # few tenths to ~2 nats per active unit once trained -- observed via
+  # Trainer's active_units diagnostic on this project's other VAE runs).
+  model.C: [5.0, 25.0, 50.0]
