@@ -6,6 +6,8 @@ mlflow:
 model:
   type: beta_vae
   latent_dim: 16
-  hidden_dims: [128, 64, 32]
-  input_length: 250
-  beta: 4.0                  # KL weight; sweep this for your ablation study
+  input_length: 256
+  beta: 4.0   # KL weight (beta=1 recovers the vanilla ELBO); sweep this
+              # for your ablation study
+  # base_channels: 16   # optional -- defaults set in beta_vae.py
+  # n_conv_layers: 4    # optional -- defaults set in beta_vae.py
